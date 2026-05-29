@@ -72,12 +72,18 @@ classdef Weather
         function [obj, sim, out] = step(obj, sim)
             % based on the current sim time, generate the forecast
             tStep = sim.time;
-            idx   = find(obj.time > tStep, 1, "first");% & obj.time < tStep + hours(239);
+            % idx   = find(obj.time > tStep, 1, "first");% & obj.time < tStep + hours(239);
+            idx = sim.iter;
+            % disp(idx-sim.iter)
+            try
             sim.forecast = [obj.windSpd(idx:(idx+obj.nForecasts)), ...
                 obj.windDir(idx:(idx+obj.nForecasts)), ...
                 obj.waveHs(idx:(idx+obj.nForecasts)), ...
                 obj.waveTp(idx:(idx+obj.nForecasts)), ...
                 obj.waveDir(idx:(idx+obj.nForecasts))];
+            catch ME
+                6;
+            end
             obj.forecast = sim.forecast;
             out = '';
         end

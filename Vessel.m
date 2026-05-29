@@ -199,7 +199,11 @@ classdef Vessel
                         obj.corridor = obj.corridorLookup.TurbineCorridor;
                     % and needs to go to platform port
                     elseif lat == obj.portLookup(1,1) && lon == obj.portLookup(1,2)
-                        obj.corridor = obj.corridorLookup.PlatformCorrdior;
+                        try
+                        obj.corridor = obj.corridorLookup.TurbineCorridor;
+                        catch me
+                            6;
+                        end
                     end
                 end
             end

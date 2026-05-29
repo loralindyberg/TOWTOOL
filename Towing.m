@@ -228,7 +228,7 @@ classdef Towing < Vessel
                     obj.towing = true;
                     out = strcat(obj.name, " is towing a platform (", num2str(obj.hold), "hrs).");
                     sim.loadPlatform = true;
-                elseif obj.towing == true && sim.towInfo(3) == 0 && obj.lat == obj.portLookup(2,1) && obj.lon == obj.portLookup(2,2)
+                elseif obj.towing == true  && obj.lat == obj.portLookup(2,1) && obj.lon == obj.portLookup(2,2)
                     % we have arrived at the turbine port with a platform
                     sim.loadPlat = true;
                     sim.towInfo(3) = inf;

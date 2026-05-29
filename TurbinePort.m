@@ -88,6 +88,8 @@ classdef TurbinePort < Port
                 out = strcat(obj.name, " has ", num2str(obj.storage), " turbines in wet storage! (TPORTBAD)");
                 return
             end
+
+            
             %catch if a platform was just unloaded
             if sim.loadPlat
                 obj.nPlat = obj.nPlat + 1;
