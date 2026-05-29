@@ -68,6 +68,12 @@ classdef Port
         %% addToStorage
         % Adds amount to storage
         function obj = addToStorage(obj, amount)
+            objVars = fieldnames(obj);
+            if contains(objVars,'nTurbines')
+                % You are at a turbine port
+            else
+                % You are at a mooring port
+            end
             obj.storage = obj.storage + amount;
         end
 
@@ -75,6 +81,16 @@ classdef Port
         %% removeFromStorage
         % removes amount from storage
         function obj = removeFromStorage(obj, amount)
+            objVars = fieldnames(obj);
+            if contains(objVars,'nPlatforms')
+                % You are at a platform port
+                obj.nPlatforms = obj.nPlatforms - 1;
+            elseif contains(objVars,'nTurbines')
+                % You are at a turbine port
+                obj.nTurbines = obj.nTurbines - 1;
+            else
+                % You are at a mooring port
+            end
             obj.storage = obj.storage - amount;
         end
     end

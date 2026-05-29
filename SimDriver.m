@@ -1,4 +1,4 @@
-     %% MORBIT Simulation Driver
+%% MORBIT Simulation Driver
 %   The UMaine mooring team Mooring focused ORBIT redesign. This system is based on the open source tool developed by
 %   NREL, ORBIT (https://github.com/WISDEM/ORBIT). It has been restructured to be a controller based stepped simulation,
 %   where each agent in the simulation is communicating laterally with all other simulation agents, as opposed to the
@@ -23,6 +23,7 @@
 
 %% Setup
 clear; close all; clc;
+%clearvars -except wind wave
 
 %% Weather Inputs
 % This is weather data from the ERA5 dataset from the CDS API.
@@ -36,7 +37,9 @@ startTime = datetime(1949, 04, 01, 1, 0, 0, 0);
 
 % Array - Load a csv from a shp file with lat, lon, and depth
 arr = readmatrix("ExampleArrayLatLon.csv");
-numTurbines = length(arr); % The number of turbines in the array
+arr = arr(1:10,:);
+arraySize = size(arr,1); % The number of turbines in the array
+
 
 % Ports - lat, lon
 humboldt  = [40.807565, -124.162268];
@@ -45,6 +48,10 @@ longbeach = [33.739737, -118.205367];
 
 % Vessel Cooridors - define the corridor coordinates and max transit speed.
 % lat, lon, speed in km/h
+
+% Mooring Integration Port - Humboldt
+% TowingCorridor = MooringCorridor;
+% TurbineMarshalPort = [humboldt, 2740];
 MooringMarshalPort = [humboldt, 0];
 MooringCorridor = [
     MooringMarshalPort(1:2), 0;
@@ -57,32 +64,47 @@ MooringCorridor = [
     40.773442, -124.250287, 5.0;
     ];
 
-% humboldt
-% TowingCorridor = MooringCorridor;
-% TurbineMarshalPort = [humboldt, 2740];
+% Turbine Integration Port - San Francisco
+ TurbineMarshalPort = [sanfran, 2740];
+ TurbineCorridor = [
+     TurbineMarshalPort(1:2), 0;
+     37.799021, -122.386430, 3.1;
+     37.831327, -122.406041, 3.1;
+     37.832565, -122.434380, 3.1;
+     37.817666, -122.478388, 5.0;
+     37.800736, -122.525967, 5.0;
+     37.779031, -122.618314, 5.0;
+     37.893440, -122.792528, 14;
+     37.939753, -123.076536, 14;
+     38.258986, -123.152197, 14;
+     38.842176, -123.856663, 14;
+     39.741013, -123.986767, 14;
+     40.666081, -124.491586, 14;
+     ];
 
-% San Francisco
-% TurbineMarshalPort = [sanfran, 2740];
-% TowingCorridor = [
-%     TurbineMarshalPort(1:2), 0;
-%     37.799021, -122.386430, 3.1;
-%     37.831327, -122.406041, 3.1;
-%     37.832565, -122.434380, 3.1;
-%     37.817666, -122.478388, 5.0;
-%     37.800736, -122.525967, 5.0;
-%     37.779031, -122.618314, 5.0;
-%     37.893440, -122.792528, 14;
-%     37.939753, -123.076536, 14;
-%     38.258986, -123.152197, 14;
-%     38.842176, -123.856663, 14;
-%     39.741013, -123.986767, 14;
-%     40.666081, -124.491586, 14;
-%     ];
+% Platform Construction Port - Long Beach
+PlatformMarshalPort = [longbeach, 2740];
+PlatformCorridor = [
+    PlatformMarshalPort(1:2), 0;
+    33.733226, -118.209396, 3.1;
+    33.686061, -118.201603, 3.1;
+    33.501702, -118.267943, 3.1;
+    34.066744, -119.295705, 5.0;
+    34.269694, -119.774961, 5.0;
+    34.295901, -120.818056, 14;
+    35.078138, -120.969683, 14;
+    36.396862, -122.181873, 14;
+    37.779031, -122.618314, 14];
+    %37.893440, -122.792528, 14;
+    %37.939753, -123.076536, 14;
+    %38.258986, -123.152197, 14;
+    %38.842176, -123.856663, 14;
+    %39.741013, -123.986767, 14;
+    %40.666081, -124.491586, 14;
+    %];
 
-% Long Beach
-TurbineMarshalPort = [longbeach, 2740];
-TowingCorridor = [
-    TurbineMarshalPort(1:2), 0;
+PlatformPortToFarm = [
+    PlatformMarshalPort(1:2), 0;
     33.733226, -118.209396, 3.1;
     33.686061, -118.201603, 3.1;
     33.501702, -118.267943, 3.1;
@@ -100,7 +122,6 @@ TowingCorridor = [
     40.666081, -124.491586, 14;
     ];
 
-
 %% Vessel Inputs
 
 % Towing Vessel
@@ -108,7 +129,7 @@ towVesselName = 'Tow';
 towTransitSpeed = 14;   % [km/h] Transit speed
 towTowSpeed = 9;        % [km/h] Tow-out speed
 towRate = 1458;         % [$/hr] Hourly rate
-towMob = 10;            % [hr] Mobilize time
+towMob = 1;            % [hr] Mobilize time
 towTransitWave = 4.75;  % [m] Wave height limit during transit
 towTransitWind = 25;    % [m/s] Wind speed limit during transit
 towTowWave = 4;       % [m] Wave height limit during tow-out
@@ -118,7 +139,7 @@ towTowWind = 15;        % [m/s] Wind speed limit during tow-out - m/s
 AHTSVesselName = 'Dino';
 AHTSSpeed = 14;         % [km/h] 
 AHTSRate = 4167;        % [$/hr] Hourly rate
-AHTSMob = 10;           % [hr] Mobilize time
+AHTSMob = 1;           % [hr] Mobilize time
 AHTSTransitWave = 4.5;  % [m] Wave height limit during transit
 AHTSTransitWind = 20;   % [m/s] Wind speed limit during transit
 AHTSPreInstallWave = 4.3; % [m] Wave height limit during pre-install
@@ -130,12 +151,13 @@ AHTSMooringWind = 15;   % [m/s] Wind speed limit during mooring install
 
 
 %% Misc Inputs
-
-numLines    = 6;        % number of lines per turbine
-turbAssemblyTime = 336; % [hr]
-WetStorage = 5;         % Max. wet storage capacity (# turbines)
-numTurb = 5;              % Number of turbines in wet storage at start
-
+numLines    = 6;            % number of lines per turbine
+turbAssemblyTime = 168;     % [hr]
+platformAssemblyTime = 336; % [hr]
+WetStorage_Turbines = 10;    % Max. wet storage capacity at turbine port
+WetStorage_Platforms = 10;   % Max. wet storage capacity at platform port
+init_Turbines = 0;          % Number of turbines in wet storage at start
+init_Platforms = 0;         % Number of platforms in wet storage at start
 
 %% Weather
 % Sample the weather data between certain dates for processing speed.
@@ -154,8 +176,6 @@ for w = 1:length(wnames)
 end
 
 
-
-
 %% Create the simulation structure
 % initialize the simulation step. This structure is passed between agents at each step of the simulation and is the way
 % that agents communicate with one another, as well as where information about each time step is extracted.
@@ -163,7 +183,7 @@ simStep = struct();
 simStep.time = 0;
 simStep.proj = wgs84Ellipsoid("km");
 
-% simStep.arry defines all of the simulation-important information about the WEA.
+% simStep.array defines all of the simulation-important information about the WEA.
     % array is lat, lon, status, id, completion time, depth (m)
         % status can be as follows:
             % 0 - Nothing installed
@@ -171,22 +191,29 @@ simStep.proj = wgs84Ellipsoid("km");
             % 2 - Moorings installed
             % 3 - Turbine installed
 simStep.array = [arr(:, [6,7]),...
-    zeros(size((1:numTurbines)')),...
-    (1:numTurbines)',...
-    zeros(size((1:numTurbines)')), abs(arr(:, 3))];
-simStep.mooringsIn = [simStep.array(:, 4), zeros(length(simStep.array), 6)];
+    zeros(size((1:arraySize)')),...
+    (1:arraySize)',...
+    zeros(size((1:arraySize)')), abs(arr(:, 3))];
+simStep.mooringsIn = [simStep.array(:, 4), zeros(size(simStep.array,1), 6)];
 
 % instantiating communications throughout the simulation.
 simStep.loadTurbine   = false; % Is the tow vessel loading a turbine
+simStep.loadPlatform  = false; % Is the tow vessel loading a platform
+simStep.loadPlat      = false; % Is the tow vessel unloading a platform
 simStep.loadMoorings  = false; % Is the AHTS loading mooring lines
 simStep.nMoorings     = 0; % number of moorings provided to ahts by the mooring port
-simStep.nTurbines     = 0; % number of turbines in wet storage
-simStep.numMoorings   = numLines; % provides number of moorings to the sim object
+simStep.nTurbines     = init_Turbines; % number of fully assembled turbines in wet storage at turbine port
+simStep.nPlatforms    = init_Platforms; % number of platforms (without turbines) in wet storage at platform port
+simStep.nPlat         = 0; % number of platforms in wet storage at turbine port (need to be assembled)
+simStep.wetStorage_Turbines = WetStorage_Turbines; %Wet storage max capacity
+simStep.wetStorage_Platforms = WetStorage_Platforms; %Wet storage max capacity
+simStep.numMoorings   = numLines; % provides number of moorings to the sim 
 simStep.AHTSonSite    = false; % tells the towing vessel if the AHTS is on site for hook up
-simStep.towInfo       = [inf inf]; % provides towing information to the AHTS
+simStep.towInfo       = [-inf -inf -inf]; % provides towing information to the AHTS
 simStep.towWait       = true; % tells the vessel that the AHTS is too far away for a tow out to start
 simStep.timeToTurbine = 0; % provide information about turbine assembly so the AHTS can leave for periods of time
 simStep.forecast      = []; % provides an empty array for the forecast, overwritten if there is a weather module
+simStep.assembled     = 0; %
 
 
 %% Vessel Corridor Info
@@ -200,11 +227,37 @@ end
 mooringCorridorInfo = struct('rallyPoint', MooringCorridor(end, 1:2), 'time', round(t));
 
 t = 0;
-for c = 2:length(TowingCorridor)
-    t = t + distance(TowingCorridor(c-1,1), TowingCorridor(c-1,2), ...
-        TowingCorridor(c,1), TowingCorridor(c,2), simStep.proj)/TowingCorridor(c,3);
+for c = 2:length(TurbineCorridor)
+    t = t + distance(TurbineCorridor(c-1,1), TurbineCorridor(c-1,2), ...
+        TurbineCorridor(c,1), TurbineCorridor(c,2), simStep.proj)/TurbineCorridor(c,3);
 end
-towingCorridorInfo = struct('rallyPoint', TowingCorridor(end, 1:2), 'time', round(t));
+turbineCorridorInfo = struct('rallyPoint', TurbineCorridor(end, 1:2), 'time', round(t));
+
+t = 0;
+for c = 2:length(PlatformCorridor)
+    t = t + distance(PlatformCorridor(c-1,1), PlatformCorridor(c-1,2), ...
+        PlatformCorridor(c,1), PlatformCorridor(c,2), simStep.proj)/PlatformCorridor(c,3);
+end
+platformCorridorInfo = struct('rallyPoint', PlatformCorridor(end, 1:2), 'time', round(t));
+
+t = 0;
+for c = 2:length(PlatformPortToFarm)
+    t = t + distance(PlatformPortToFarm(c-1,1), PlatformPortToFarm(c-1,2), ...
+        PlatformPortToFarm(c,1), PlatformPortToFarm(c,2), simStep.proj)/PlatformPortToFarm(c,3);
+end
+platformPortToFarmInfo = struct('rallyPoint', PlatformPortToFarm(end, 1:2), 'time', round(t));
+
+if PlatformMarshalPort == TurbineMarshalPort
+    PortsSame = 1; %yes
+    TowPortLocation = TurbineMarshalPort;
+    TowCorridorInfo = platformCorridorInfo;
+else
+    PortsSame = 0; %no
+    TowPortLocation = [PlatformMarshalPort; TurbineMarshalPort];
+    TowCorridorInfo = struct('PlatformCorridor',platformCorridorInfo,'TurbineCorridor',turbineCorridorInfo,'PortToFarm',platformPortToFarmInfo);
+end
+
+simStep.PortsSame     = PortsSame; % Is turbine port the same as platform port
 
 
 %% Agents
@@ -212,20 +265,30 @@ towingCorridorInfo = struct('rallyPoint', TowingCorridor(end, 1:2), 'time', roun
 % Each variable provided to an agent is described in the architecture document.
 agents = struct( ...
     ... Weather(time, windSpd, windDir, waveHs, waveTp, waveDir) 
-    'Weather', Weather(wind.t, wind.Spd, wind.Dir, wave.Hstotal, wave.TpTotal, wave.DmTotal),...
-    ... Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, towingLim)
-    'TowVessel', Towing(towVesselName, towTransitSpeed, [towTransitSpeed towTowSpeed], towRate, towMob, TurbineMarshalPort(1:2), towingCorridorInfo, [towTransitWave; towTransitWind], [towTowWave; towTowWind]), ...
+    'Weather', Weather(wind.t, wind.Spd, wind.Dir, wave.Hstotal, wave.TpTotal, wave.DmTotal), ...
+    ... Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, turbineLocation, turbineCorridor, portLocations, Corridors, transitLim, towingLim, simStep)
+    'TowVessel', Towing(towVesselName, towTransitSpeed, [towTransitSpeed towTowSpeed], towRate, towMob, TowPortLocation, TowCorridorInfo, [towTransitWave; towTransitWind], [towTowWave; towTowWind]), ...
     ... AHTS(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, preinstallLim, anchorLim, mooringLim)
     'AHTS', AHTS(AHTSVesselName, AHTSSpeed, [AHTSSpeed AHTSSpeed], AHTSRate, AHTSMob, MooringMarshalPort(1:2), mooringCorridorInfo, [AHTSTransitWave; AHTSTransitWind], [AHTSPreInstallWave; AHTSPreInstallWind], [AHTSAnchorWave; AHTSAnchorWind], [AHTSMooringWave; AHTSMooringWind]), ...
     ... MooringPort(name, lat, lon, hourlyRate)
     'MooringPort', MooringPort("Mooring Port", MooringMarshalPort(1), MooringMarshalPort(2), MooringMarshalPort(3)), ...
-    ... TurbinePort(name, lat, lon, hourlyRate, assemblyTime, maxTurbines)
-    'TurbinePort', TurbinePort("Turbine Port", TurbineMarshalPort(1), TurbineMarshalPort(2), TurbineMarshalPort(3), turbAssemblyTime, numTurbines));
+    ... TurbinePort(namelat, lon, hourlyRate, assemblyTime, arraySize)
+    'TurbinePort', TurbinePort("Turbine Port", TurbineMarshalPort(1), TurbineMarshalPort(2), TurbineMarshalPort(3), turbAssemblyTime, arraySize));
 
 % Set some data in the ports
-agents.MooringPort = agents.MooringPort.addToStorage(numLines*numTurbines);
-agents.TurbinePort = agents.TurbinePort.SetMaxStorage(WetStorage);
-agents.TurbinePort = agents.TurbinePort.InitStorage(numTurb);
+agents.MooringPort = agents.MooringPort.addToStorage(numLines*arraySize);
+agents.TurbinePort = agents.TurbinePort.SetMaxStorage(WetStorage_Turbines);
+agents.TurbinePort = agents.TurbinePort.InitStorage(init_Turbines);
+
+if PortsSame == 0
+    % Add platform port as a new agent (separate from Turbine Port)
+    agents = setfield(agents, ...
+        ...PlatformPort(name, lat, lon, hourlyRate, assemblyTime, arraySize)
+        'PlatformPort', PlatformPort("Platform Port", PlatformMarshalPort(1), PlatformMarshalPort(2), PlatformMarshalPort(3), platformAssemblyTime, arraySize));
+    
+    agents.PlatformPort = agents.PlatformPort.SetMaxStorage(WetStorage_Platforms);
+    agents.PlatformPort = agents.PlatformPort.InitStorage(init_Platforms);
+end
 
 
 %% Run the simulation
@@ -237,10 +300,16 @@ weatherCounts = zeros(size(fnames));
 
 % iter should never approach iterMax, and in fact typically there will be an error in the weather module before 1e6
 % steps occur.
+towInfoA = simStep.towInfo;
 while ~all(done) && iter <= iterMax
     % Step forward in time.
     simStep.time = startTime + hours(iter);
 
+    if sum(towInfoA ~= simStep.towInfo)
+
+        disp(simStep.towInfo)
+        towInfoA = simStep.towInfo;
+    end
     % call each agent.
     for arr = 1:length(fnames)
         [agents.(fnames{arr}), simStep, out] = agents.(fnames{arr}).step(simStep);
@@ -256,6 +325,8 @@ while ~all(done) && iter <= iterMax
             done(arr) = true;
         end
     end
+
+    simStep.agents = agents;
 
     % Bookkeeping
     iter = iter + 1;
@@ -315,4 +386,43 @@ fprintf('The %s spent %0.1f days on leave, %0.1f days docked.\n', agents.TowVess
 fprintf('Total time: %0.4f days\n', days(time - startTime))
 
 
-%% Clean up
+%% Postprocess
+% Update results plot
+            l = length(simSave.time);
+            timeFromStart = 1:l;
+            for i = 1:l
+                statusi = simSave.arrayStatus{i,1}(:,2);
+                mooringsInProgress(i) = sum(statusi==1);
+                turbinesComplete(i) = sum(statusi==3);
+                mooringsComplete(i) = turbinesComplete(i) + sum(statusi==2);
+                mooringStorage(i,1) = simSave.MooringPort(i,1).storage/6;
+                turbineStorage(i,1) = simSave.TurbinePort(i,1).storage;
+            end
+            daysFromStart = timeFromStart./24;
+            plot(daysFromStart, mooringsInProgress)
+            hold on
+            plot(daysFromStart, mooringsComplete)
+            plot(daysFromStart, turbinesComplete)
+            plot(daysFromStart, mooringStorage)
+            plot(daysFromStart, turbineStorage)
+            legend('Moorings in Progress', 'Moorings Complete', 'Turbines Installed','Moorings in Storage', 'Turbines in Storage')
+            hold 'off'
+            
+            % Update Results Table
+            % Results = [WeatherDelays(days) WorkingTime(days) Costs(M$)]
+            % TowDelay = round(weatherCounts(2)/24,1); % [days] Weather delay
+            % TowWorking = round(days(agents.TowVessel.time - startTime),1); % [days] Working time
+            % TowCost = agents.TowVessel.cost/1000000; % [M$]
+            % AHTSDelay = round(weatherCounts(3)/24,1); % [days] Weather delay
+            % AHTSWorking = round(days(agents.AHTS.time - startTime),1); % [days] Working time
+            % AHTSCost = agents.AHTS.cost/1000000; % [M$]
+            % MooringPortDelay = round(weatherCounts(4)/24,1); % [days] Weather delay
+            % MooringPortWorking = round(days(agents.MooringPort.time - startTime),1); % [days] Working time
+            % MooringPortCost = agents.MooringPort.cost/1000000; % [M$]
+            % TurbinePortDelay = round(weatherCounts(3)/24,1); % [days] Weather delay
+            % TurbinePortWorking = round(days(agents.TurbinePort.time - startTime),1); % [days] Working time
+            % TurbinePortCost = agents.TurbinePort.cost/1000000; % [M$]
+            % app.ResultsTable.ColumnName = {'Tow Vessel', 'AHTS', 'Mooring Port', 'TurbinePort'};
+            % app.ResultsTable.RowName = {'Weather Delay (days)','Working Time (days)', 'Cost (M$)'};
+            % app.ResultsTable.Data = table([TowDelay;TowWorking;TowCost], [AHTSDelay;AHTSWorking;AHTSCost], [MooringPortDelay;MooringPortWorking;MooringPortCost], [TurbinePortDelay;TurbinePortWorking;TurbinePortCost]);
+            % 

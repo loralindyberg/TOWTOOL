@@ -38,7 +38,8 @@ classdef AHTS < Vessel
     methods
         %% Class constructor
         function obj = AHTS(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, preinstallLim, anchorLim, mooringLim)%, cable)
-            obj = obj@Vessel(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
+            type = 'AHTS';
+            obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
             obj.limits = struct('Name', {"Transit"; "PreInstall"; "InstallingAnchor"; "InstallingMooring"}, ...
                 'Hs', {transitLim(1); preinstallLim(1); anchorLim(1); mooringLim(1)}, ...
                 'Vhub', {transitLim(2); preinstallLim(2); anchorLim(2); mooringLim(2)});

@@ -8,6 +8,7 @@
 %
 %   Created:     Oct 18, 2024
 %   Modified:    Jan 09, 2025
+%   Modified:    Mar 02, 2026 - AL - Added integration port
 
 
 classdef Vessel
@@ -23,6 +24,8 @@ classdef Vessel
         hourlyRate (1,1) double {mustBeNumeric,mustBePositive,mustBeFinite,mustBeReal} = 4166.67;
         % the name/identifier of the vessel
         name (1,1) string {mustBeText,mustBeNonzeroLengthText} = "Default Vessel"
+        % the type of vessel
+        type (1,1) string {mustBeText,mustBeNonzeroLengthText} = "Default Vessel"
         % the number of moorings per turbine
         moorsPerTurb (1,1) double {mustBeNumeric,mustBePositive,mustBeFinite,mustBeReal} = 3;
         % the status of the agent at each simulation step
@@ -43,6 +46,16 @@ classdef Vessel
         timeOnLeave (1,1) double {mustBeNumeric,mustBeNonnegative,mustBeFinite,mustBeReal} = 0;
         % number of hours on the docked status
         timeDocked (1,1) double {mustBeNumeric,mustBeNonnegative,mustBeFinite,mustBeReal} = 0;
+        % the port of origin of this vessel, where it goes to dock and take leave
+        port (2,1) double {mustBeNumeric,mustBeFinite,mustBeReal} = [40.7523, -124.2091]
+        % the port(s) of origin 
+        portLookup (2,2) double {mustBeNumeric,mustBeFinite,mustBeReal} = [40.7523, -124.2091; 0, 0]
+        % used for weather delays to keep track of what the vessel was doing before the delay
+        heldStatus (1,1) string {mustBeText,mustBeNonzeroLengthText} = "null"
+        % information for the transit corridor
+        corridor struct = struct()
+        % the transfer corridors (if multiple ports)
+        corridorLookup struct = struct()
     end
 
 
@@ -57,42 +70,44 @@ classdef Vessel
         installIdx (1,1) double {mustBeNumeric,mustBeNonnegative,mustBeFinite,mustBeReal} = 999
         % weather based limits for various actions the vessel can take
         limits struct = struct()
-        % the port of origin of this vessel, where it goes to dock and take leave
-        port (2,1) double {mustBeNumeric,mustBeFinite,mustBeReal} = [40.7523; -124.2091]
-        % used for weather delays to keep track of what the vessel was doing before the delay
-        heldStatus (1,1) string {mustBeText,mustBeNonzeroLengthText} = "null"
-        % information for the transit corridor
-        corridor struct = struct()
     end
 
 
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = Vessel(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
+        function obj = Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
             % Save vessel identifiers.
             obj.name = name;
+            obj.type = type;
 
             % Save vessel information.
             obj.mobilizeTime = mobilizeTime;
             obj.hourlyRate = hourlyRate;
             obj.speedLookup = speedLookup;
-            if obj.status == 'Towing'
-                obj.speed = speedLookup(2);
-            else
-                obj.speed = speedLookup(1);
-            end
 
-            % Save vessel starting location and port location.
-            obj.lat = startLocation(1);
-            obj.lon = startLocation(2);
-            obj.port = startLocation;
-
-            % Save near shore transit corridor if provided.
-            if ~isempty(corridor)
+            % AHTS - save vessel starting location and port location
+            if obj.type == 'AHTS'
+                obj.lat = startLocation(1,1);
+                obj.lon = startLocation(1,2);
+                obj.port = [startLocation(1,1), startLocation(1,2)];
                 obj.corridor = corridor;
-            else
-                obj.cooridor = cooridor;
+
+            % Tow Vessel - Save vessel starting location (assume platform port) and port location.
+            elseif obj.type == 'Tow Vessel'
+                obj.lat = startLocation(1,1);
+                obj.lon = startLocation(1,2);
+                obj.port = startLocation(1,1:2);
+                obj.corridorLookup = corridor;
+                if size(startLocation,1) == 1
+                    obj.portLookup = startLocation(1:2);
+                    obj.corridor = corridor;
+                else
+                    obj.portLookup = startLocation(:,1:2);
+                    obj.corridor = corridor.PlatformCorridor;
+                end
+            else 
+                disp('ERROR: Unrecognized vessel type')
             end
 
             % Initialize the mobilization oh the vessel.
@@ -104,6 +119,13 @@ classdef Vessel
         % this is the main funciton called in the simulation and represents actions that every vessel will take at every
         % timestep.
         function [obj, delay] = step(obj, sim)
+            % Reduce speed if towing
+            if obj.status == 'Towing'
+                obj.speed = obj.speedLookup(2);
+            else
+                obj.speed = obj.speedLookup(1);
+            end
+            
             % Get the number of moorings from the simulation object
             if obj.moorsPerTurb ~= sim.numMoorings
                 obj.moorsPerTurb = sim.numMoorings;
@@ -158,6 +180,30 @@ classdef Vessel
         %% transit
         % sets up the necessary behaviors for the "Transit" status
         function [obj, out] = transit(obj, lat, lon, proj)
+            % Multi-port - Switch port & corridor
+            if obj.type == "Tow Vessel" && obj.portLookup(2,2) ~= 0 %if multiple ports
+                if obj.lat == obj.portLookup(1,1) && obj.lon == obj.portLookup(2,2) % if vessel is currently in platform port
+                    % tow platform to turbine port
+                    obj.corridor = obj.corridorLookup.PlatformCorrdior;
+                elseif obj.lat == obj.portLookup(2,1) && obj.lon == obj.portLookup(2,2) % if vessel currently in turbine port
+                    % and needs to go to platform port
+                    if lat == obj.portLookup(1,1) && lon == obj.portLookup(1,2)
+                        obj.corridor = obj.corridorLookup.PlatformCorridor;
+                    % and needs to tow a turbine out
+                    else
+                        obj.corridor = obj.corridorLookup.TurbineCorridor;
+                    end
+                else % vessel is not in either port 
+                    % and needs to go to the turbine port
+                    if lat == obj.portLookup(2,1) && lon == obj.portLookup(2,2)
+                        obj.corridor = obj.corridorLookup.TurbineCorridor;
+                    % and needs to go to platform port
+                    elseif lat == obj.portLookup(1,1) && lon == obj.portLookup(1,2)
+                        obj.corridor = obj.corridorLookup.PlatformCorrdior;
+                    end
+                end
+            end
+            
             % check for a corridor, if none just do transit as before
             % confirm corridor information
             if ~isempty(obj.corridor) && (lat == obj.port(1) && lon == obj.port(2))
