@@ -100,7 +100,7 @@ classdef Vessel
                 obj.port = startLocation(1,1:2);
                 obj.corridorLookup = corridor;
                 if size(startLocation,1) == 1
-                    obj.portLookup = startLocation(1:2);
+                    obj.portLookup = [startLocation(1:2); 0,0];
                     obj.corridor = corridor;
                 else
                     obj.portLookup = startLocation(:,1:2);

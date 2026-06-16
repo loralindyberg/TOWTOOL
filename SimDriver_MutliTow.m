@@ -72,10 +72,6 @@ tow2TransitWind = 25;    % [m/s] Wind speed limit during transit
 tow2TowWave = 4;       % [m] Wave height limit during tow-out
 tow2TowWind = 15;        % [m/s] Wind speed limit during tow-out - m/s
 
-
-
-
-
 % AHTS Vessel
 AHTSVesselName = 'Dino';
 AHTSSpeed = 14;         % [km/h]

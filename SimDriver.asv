@@ -51,15 +51,26 @@ arraySize = size(arr,1); % The number of turbines in the array
 %% Vessel Inputs
 
 % Towing Vessel
-towVesselName = 'Tow';
-towTransitSpeed = 14;   % [km/h] Transit speed
-towTowSpeed = 9;        % [km/h] Tow-out speed
-towRate = 1458;         % [$/hr] Hourly rate
-towMob = 1;            % [hr] Mobilize time
-towTransitWave = 4.75;  % [m] Wave height limit during transit
-towTransitWind = 25;    % [m/s] Wind speed limit during transit
-towTowWave = 4;       % [m] Wave height limit during tow-out
-towTowWind = 15;        % [m/s] Wind speed limit during tow-out - m/s
+tow1VesselName = 'Tow1';
+tow1TransitSpeed = 14;   % [km/h] Transit speed
+tow1TowSpeed = 9;        % [km/h] Tow-out speed
+tow1Rate = 1458;         % [$/hr] Hourly rate
+tow1Mob = 1;            % [hr] Mobilize time
+tow1TransitWave = 4.75;  % [m] Wave height limit during transit
+tow1TransitWind = 25;    % [m/s] Wind speed limit during transit
+tow1TowWave = 4;       % [m] Wave height limit during tow-out
+tow1TowWind = 15;        % [m/s] Wind speed limit during tow-out - m/s
+
+% Towing Vessel
+tow2VesselName = 'Tow2';
+tow2TransitSpeed = 14;   % [km/h] Transit speed
+tow2TowSpeed = 9;        % [km/h] Tow-out speed
+tow2Rate = 1458;         % [$/hr] Hourly rate
+tow2Mob = 1;            % [hr] Mobilize time
+tow2TransitWave = 4.75;  % [m] Wave height limit during transit
+tow2TransitWind = 25;    % [m/s] Wind speed limit during transit
+tow2TowWave = 4;       % [m] Wave height limit during tow-out
+tow2TowWind = 15;        % [m/s] Wind speed limit during tow-out - m/s
 
 % AHTS Vessel
 AHTSVesselName = 'Dino';
@@ -78,12 +89,12 @@ AHTSMooringWind = 15;   % [m/s] Wind speed limit during mooring install
 
 %% Misc Inputs
 numLines    = 6;            % number of lines per turbine
-turbAssemblyTime = 168;     % [hr]
-platformAssemblyTime = 336; % [hr]
+turbAssemblyTime = 8; %168/4;     % [hr]
+platformAssemblyTime = 336/4; % [hr]
 WetStorage_Turbines = 10;    % Max. wet storage capacity at turbine port
 WetStorage_Platforms = 10;   % Max. wet storage capacity at platform port
 init_Turbines = 0;          % Number of turbines in wet storage at start
-init_Platforms = 0;         % Number of platforms in wet storage at start
+init_Platforms = 10;         % Number of platforms in wet storage at start
 
 %% Weather
 % Sample the weather data between certain dates for processing speed.
@@ -177,7 +188,7 @@ platformPortToFarmInfo = struct('rallyPoint', PlatformPortToFarm(end, 1:2), 'tim
 
 if PlatformMarshalPort == TurbineMarshalPort
     PortsSame = 1; %yes
-    TowPortLocation = TurbineMarshalPort;
+    TowPortLocation = [PlatformMarshalPort];
     TowCorridorInfo = platformCorridorInfo;
 else
     PortsSame = 0; %no
@@ -194,30 +205,26 @@ simStep.PortsSame     = PortsSame; % Is turbine port the same as platform port
 agents = struct( ...
     ... Weather(time, windSpd, windDir, waveHs, waveTp, waveDir)
     'Weather', Weather(wind.t, wind.Spd, wind.Dir, wave.Hstotal, wave.TpTotal, wave.DmTotal), ...
-    ... Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, turbineLocation, turbineCorridor, portLocations, Corridors, transitLim, towingLim, simStep)
-    'TowVessel', Towing(towVesselName, towTransitSpeed, [towTransitSpeed towTowSpeed], towRate, towMob, TowPortLocation, TowCorridorInfo, [towTransitWave; towTransitWind], [towTowWave; towTowWind]), ...
     ... AHTS(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, preinstallLim, anchorLim, mooringLim)
     'AHTS', AHTS(AHTSVesselName, AHTSSpeed, [AHTSSpeed AHTSSpeed], AHTSRate, AHTSMob, MooringMarshalPort(1:2), mooringCorridorInfo, [AHTSTransitWave; AHTSTransitWind], [AHTSPreInstallWave; AHTSPreInstallWind], [AHTSAnchorWave; AHTSAnchorWind], [AHTSMooringWave; AHTSMooringWind]), ...
+    ... Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, turbineLocation, turbineCorridor, portLocations, Corridors, transitLim, towingLim, simStep)
+    'TowVessel1', Towing_new(tow1VesselName, tow1TransitSpeed, [tow1TransitSpeed tow1TowSpeed], tow1Rate, tow1Mob, TowPortLocation, TowCorridorInfo, [tow1TransitWave; tow1TransitWind], [tow1TowWave; tow1TowWind])),...
     ... MooringPort(name, lat, lon, hourlyRate)
     'MooringPort', MooringPort("Mooring Port", MooringMarshalPort(1), MooringMarshalPort(2), MooringMarshalPort(3)), ...
-    ... TurbinePort(namelat, lon, hourlyRate, assemblyTime, arraySize)
-    'TurbinePort', TurbinePort("Turbine Port", TurbineMarshalPort(1), TurbineMarshalPort(2), TurbineMarshalPort(3), turbAssemblyTime, arraySize));
-
+    ...PlatformPort(name, lat, lon, hourlyRate, assemblyTime, arraySize)
+    'PlatformPort', PlatformPort("Platform Port", PlatformMarshalPort(1), PlatformMarshalPort(2), PlatformMarshalPort(3), platformAssemblyTime, arraySize));
+    
 % Set some data in the ports
 agents.MooringPort = agents.MooringPort.addToStorage(numLines*arraySize);
-agents.TurbinePort = agents.TurbinePort.SetMaxStorage(WetStorage_Turbines);
-agents.TurbinePort = agents.TurbinePort.InitStorage(init_Turbines);
+agents.PlatformPort = agents.PlatformPort.SetMaxStorage(WetStorage_Platforms);
+agents.PlatformPort = agents.PlatformPort.InitStorage(init_Platforms);
 
 if PortsSame == 0
-    % Add platform port as a new agent (separate from Turbine Port)
+    % Add Turbine port agent
     agents = setfield(agents, ...
-        ...PlatformPort(name, lat, lon, hourlyRate, assemblyTime, arraySize)
-        'PlatformPort', PlatformPort("Platform Port", PlatformMarshalPort(1), PlatformMarshalPort(2), PlatformMarshalPort(3), platformAssemblyTime, arraySize));
-
-    agents.PlatformPort = agents.PlatformPort.SetMaxStorage(WetStorage_Platforms);
-    agents.PlatformPort = agents.PlatformPort.InitStorage(init_Platforms);
+        ... TurbinePort(namelat, lon, hourlyRate, assemblyTime, arraySize)
+    'TurbinePort', TurbinePort("Turbine Port", TurbineMarshalPort(1), TurbineMarshalPort(2), TurbineMarshalPort(3), turbAssemblyTime, arraySize));
 end
-
 
 %% Run the simulation
 fnames = fieldnames(agents);
@@ -228,25 +235,24 @@ weatherCounts = zeros(size(fnames));
 
 % iter should never approach iterMax, and in fact typically there will be an error in the weather module before 1e6
 % steps occur.
-towInfoA = simStep.towInfo;
+% towInfoA = simStep.towInfo;
+% towInfoA = agents.TowVessel.status;
 while ~all(done) && iter <= iterMax
     % Step forward in time.
-
-if iter == 336
-    6;
-end
-    if ~strcmp(agents.TowVessel.status, "Docked")
-        6;
-    end
     simStep.time = startTime + hours(iter);
+    simStep.iter = iter + 1;
 
-    if sum(towInfoA ~= simStep.towInfo)
+    % if ~strcmp(towInfoA, agents.TowVessel.status)
+        % disp(simStep.towInfo)
+        % disp(agents.TowVessel.status)
+        % towInfoA = agents.TowVessel.status;
+    % end
 
-        disp(simStep.towInfo)
-        towInfoA = simStep.towInfo;
-    end
+
+
     % call each agent.
     for arr = 1:length(fnames)
+
         [agents.(fnames{arr}), simStep, out] = agents.(fnames{arr}).step(simStep);
         disp(out)
 
@@ -282,7 +288,7 @@ end
 
 % Convert to a table (for some reason this is more matlab memory efficient) and save
 simSave = struct2table(simSave);
-save([char(datetime('now','Format','yyyyMMdd''_''HHmm')) '_MORBIT_results.mat'], "simSave")
+% save([char(datetime('now','Format','yyyyMMdd''_''HHmm')) '_MORBIT_results.mat'], "simSave")
 
 
 %% Quick outputs
@@ -317,7 +323,7 @@ for arr = 1:length(fnames)
     time = max([agents.(fnames{arr}).time, time]);
 end
 fprintf('The %s spent %0.1f days on leave, %0.1f days docked.\n', agents.AHTS.name, agents.AHTS.timeOnLeave/24, agents.AHTS.timeDocked/24);
-fprintf('The %s spent %0.1f days on leave, %0.1f days docked.\n', agents.TowVessel.name, agents.TowVessel.timeOnLeave/24, agents.TowVessel.timeDocked/24);
+% fprintf('The %s spent %0.1f days on leave, %0.1f days docked.\n', agents.TowVessel.name, agents.TowVessel.timeOnLeave/24, agents.TowVessel.timeDocked/24);
 fprintf('Total time: %0.4f days\n', days(time - startTime))
 
 

@@ -10,7 +10,7 @@
 %   Modified:    Jan 08, 2026 - added integration port
 
 
-classdef TowingMulti < Vessel
+classdef TowingMultiPort < Vessel
     %% Private properties, only available to this class
     % these can only be acessed and changed from inside a class method.
     properties (Access = protected)
@@ -22,7 +22,7 @@ classdef TowingMulti < Vessel
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = TowingMulti(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors, transitLim, towingLim)
+        function obj = TowingMultiPort(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors, transitLim, towingLim)
             type = 'Tow Vessel';
             obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors);
             obj.limits = struct('Name', {"Transit"; "Towing"}, ...

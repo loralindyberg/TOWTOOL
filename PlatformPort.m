@@ -150,6 +150,9 @@ classdef PlatformPort < Port
             %% fill the sim variable and update internal time
             sim.nPlatforms = obj.nPlatforms;
             sim.timeToPlatform = round(sim.timeToPlatform);
+            if sim.PortsSame == 1
+                sim.timeToTurbine = sim.timeToPlatform;
+            end
         end
     end
 end

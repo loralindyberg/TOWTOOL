@@ -88,13 +88,14 @@ classdef TurbinePort < Port
                 out = strcat(obj.name, " has ", num2str(obj.storage), " turbines in wet storage! (TPORTBAD)");
                 return
             end
-
             
             %catch if a platform was just unloaded
-            if sim.loadPlat
-                obj.nPlat = obj.nPlat + 1;
-                out = strcat("Platform added to Turbine port wet storage.");
-                sim.loadPlat = false;
+            if sim.PortsSame == 0
+                if sim.loadPlat 
+                    obj.nPlat = obj.nPlat + 1;
+                    out = strcat("Platform added to Turbine port wet storage.");
+                    sim.loadPlat = false;
+                end
             end
 
             %% Enact weather delay
@@ -108,12 +109,14 @@ classdef TurbinePort < Port
                     out = strcat(out, ".. Turbine removed from wet storage.");
                 end
                 return
-            elseif obj.nPlat > 0
+            elseif obj.nPlat > 0 && sim.PortsSame == 0
                 % randomly increase/decrease work time by an hour on a 1/2^n chance
                 % prob = 2^6;
                 % if randi([1,prob], 1) == prob
                 %     obj.workTime = max([obj.workTime + sign(normrnd(0,1)), 0]);
                 % end
+                obj.workTime = obj.workTime + 1;
+            elseif sim.PortsSame == 1
                 obj.workTime = obj.workTime + 1;
             end
 
@@ -124,25 +127,30 @@ classdef TurbinePort < Port
                 % port operations are finished
                 [obj, out] = obj.finish(sim.time);
                 out = strcat(out, ' All turbines towed.');
-                sim.timeToTurbine = 1000000000;
+                sim.timeToTurbine = 0;
             elseif obj.assembled == obj.arraySize
                 % Turbine assembly has ended, purely wet storage
                 out = 'All turbines assembled.';
                 obj.status = "Assembly Finished";
-                sim.timeToTurbine = 1000000000;
-            elseif rem(obj.workTime - obj.assemblyTime*(obj.assembled)/obj.assemblyTime, obj.assemblyTime) >=1
+                sim.timeToTurbine = 0;
+            elseif rem(obj.workTime - obj.assemblyTime*obj.assembled/obj.assemblyTime, obj.assemblyTime) >=1
                 % a turbine has been assembled
                 obj.nTurbines = obj.nTurbines + 1; %add turbine to "Ready" wet storage
                 obj.assembled = obj.assembled + 1;
-                obj.nPlat = obj.nPlat - 1; %remove platform from "Not Ready" wet storage 
+                if sim.PortsSame == 0
+                    obj.nPlat = obj.nPlat - 1; %remove platform from "Not Ready" wet storage 
+                    out = 'Turbine completed outfitting and moved to "Ready" storage.';
+                else
+                    out = 'Turbine completed and moved to wet storage.';
+                end
                 obj = obj.addToStorage(1);
-                out = 'Turbine completed outfitting and moved to "Ready" storage.';
+                
                 if obj.nTurbines == obj.arraySize
-                    sim.timeToTurbine = 1000000000;
+                    sim.timeToTurbine = 0;
                 else
                     sim.timeToTurbine = (1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
                 end
-            elseif  obj.nPlat > 0 % assembly is in progress
+            elseif  obj.nPlat > 0 && sim.PortsSame == 0 % assembly is in progress
                 out = 'Turbine assembly in progress.';
                 obj.status = "Assembling";
                 sim.timeToTurbine = (1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;

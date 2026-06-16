@@ -1,7 +1,6 @@
 function[MooringMarshalPort, MooringCorridor, TurbineMarshalPort, TurbineCorridor,...
     PlatformMarshalPort, PlatformCorridor, PlatformPortToFarm] = initializeCorridors()
 
-
 % Ports - lat, lon
 humboldt  = [40.807565, -124.162268];
 sanfran   = [37.794402, -122.391938];
@@ -43,6 +42,8 @@ MooringCorridor = [
      40.666081, -124.491586, 14;
      ];
 
+
+
 % Platform Construction Port - Long Beach
 PlatformMarshalPort = [longbeach, 2740];
 PlatformCorridor = [
@@ -63,6 +64,9 @@ PlatformCorridor = [
     %39.741013, -123.986767, 14;
     %40.666081, -124.491586, 14;
     %];
+
+%PlatformMarshalPort = TurbineMarshalPort;
+%PlatformCorridor = TurbineCorridor;
 
 PlatformPortToFarm = [
     PlatformMarshalPort(1:2), 0;
