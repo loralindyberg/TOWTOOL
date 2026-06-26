@@ -74,12 +74,17 @@ classdef TurbinePort < Port
             [obj, delay] = step@Port(obj, sim);
 
 
+            if sim.PortsSame == 1
+                obj.status = 'Finished';
+                out = '';
+                return
+            end
+
             %% This is the end condition. Once this is met, the port stops accruing cost
             if obj.status == "Finished"
                 out = '';
                 return
             end
-
 
             %% Check wet storage, if we are maxed out we stop
             if ~sim.loadTurbine && obj.nTurbines == obj.maxStorage

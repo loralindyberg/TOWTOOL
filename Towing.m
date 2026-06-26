@@ -226,7 +226,7 @@ classdef Towing < Vessel
                         obj.status = "Towing";
                         obj.speed = obj.speedLookup(2);
                         obj.towing = true;
-                        out = strcat(obj.name, " is towing out a fully assembled Turbine (", num2str(obj.hold), "hrs).");
+                        out = strcat(obj.name, " is towing out a fully assembled turbine (", num2str(obj.hold), "hrs).");
                         sim.loadPlatform = true;
                         sim.towInfo(2) = obj.hold;
                     end
@@ -252,7 +252,7 @@ classdef Towing < Vessel
                     obj = obj.transit(obj.port(1), obj.port(2), sim.proj);
                     out = strcat(obj.name, " is returning to port.");
                     obj.speed = obj.speedLookup(1);
-                elseif sim.nTurbines > 0 && ~any(sim.array(:, 3) == 2)
+                elseif sim.nPlatforms > 0 && ~any(sim.array(:, 3) == 2)
                     obj = obj.findLocation(sim.array, sim.proj);
                     sim.towInfo(1) = obj.installIdx;
                     obj.status = "Docked";
@@ -262,7 +262,7 @@ classdef Towing < Vessel
                 else
                     % tow vessel is waiting
                     obj.status = "Docked";
-                    out = strcat(obj.name, " is currently waiting for an available turbine.");
+                    out = strcat(obj.name, " is currently waiting for an available turbine");
                     obj.speed = obj.speedLookup(1);
                 end
             end

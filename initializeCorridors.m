@@ -62,11 +62,12 @@ PlatformCorridor = [
     %38.258986, -123.152197, 14;
     %38.842176, -123.856663, 14;
     %39.741013, -123.986767, 14;
-    %40.666081, -124.491586, 14;
-    %];
+    %40.666081, -124.491586, 14];
 
 %PlatformMarshalPort = TurbineMarshalPort;
 %PlatformCorridor = TurbineCorridor;
+%TurbineMarshalPort = PlatformMarshalPort;
+%TurbineCorridor = PlatformCorridor;
 
 PlatformPortToFarm = [
     PlatformMarshalPort(1:2), 0;
