@@ -21,12 +21,15 @@ classdef Towing < Vessel
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors, transitLim, towingLim)
+        function obj = Towing(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors, transitLim, towingLim, lim, no)
             type = 'Tow Vessel';
-            obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors);
+            obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocations, corridors, lim, no);
             obj.limits = struct('Name', {"Transit"; "Towing"}, ...
                 'Hs', {transitLim(1); towingLim(1)}, ...
                 'Vhub', {transitLim(2); towingLim(2)});
+            if obj.lim == 1
+                sim.towLim = 1;
+            end
         end
 
         %% step
@@ -72,7 +75,7 @@ classdef Towing < Vessel
                     if obj.towing == 1 && isequal(obj.corridor, obj.corridorLookup.TurbineCorridor) && any(sim.array(:,3)==2) && sim.towInfo(3) == inf && sim.nTurbines > 0 %towing turbine to site
                         sim.towInfo = [obj.installIdx obj.hold inf];
                     elseif obj.towing == 1 && isequal(obj.corridor, obj.corridorLookup.PlatformCorridor) %towing platform to turbine port
-                        sim.towInfo = [inf inf obj.hold];
+                        sim.towInfo = [999 inf obj.hold];
                     else
                         sim.towInfo = [obj.installIdx inf inf];
                     end
@@ -86,6 +89,9 @@ classdef Towing < Vessel
                 out = strcat(obj.name, " is currently ", obj.status, ".");
                 return
             end
+
+            %if sim.loadPlat(obj.no)
+
 
 
             %% Multiple ports
@@ -137,6 +143,7 @@ classdef Towing < Vessel
                     % we have arrived, but the AHTS is not here yet
                     obj.status = "OnSite";
                     sim.towInfo(2) = 0;
+                    sim.towInfo(1) = obj.installIdx;
                     out = strcat(obj.name, " is waiting on site with a turbine.");
                     obj.speed = obj.speedLookup(2);
                 elseif sim.nTurbines > 0 && obj.lat == obj.port(1) && obj.lat == obj.portLookup(2,1) && obj.lon == obj.port(2) && obj.lon == obj.portLookup(2,2) && any(sim.array(:, 3) == 2)
@@ -153,6 +160,7 @@ classdef Towing < Vessel
                     else
                         % tow a turbine out to the array
                         obj = obj.findLocation(sim.array, sim.proj);
+                        
                         obj = obj.transit(sim.array(obj.installIdx, 1), sim.array(obj.installIdx, 2), sim.proj);
                         obj.hold = obj.hold + 14; % account for attaching and ballasting, etc...
                         obj.status = "Towing";
@@ -208,7 +216,7 @@ classdef Towing < Vessel
             %% Same port
             elseif sim.PortsSame == 1
                 % Decision matrix for the towing vessel
-                if sim.nPlatforms > 0 && obj.lat == obj.port(1) && obj.lon == obj.port(2) && any(sim.array(:, 3) == 2)
+                if sim.nTurbines > 0 && obj.lat == obj.port(1) && obj.lon == obj.port(2) && any(sim.array(:, 3) == 2)
                     obj = obj.findLocation(sim.array, sim.proj);
                     sim.towInfo(1) = obj.installIdx;
                     % if there are available turbines, and there are available mooring site, and the towing vessel
@@ -227,7 +235,7 @@ classdef Towing < Vessel
                         obj.speed = obj.speedLookup(2);
                         obj.towing = true;
                         out = strcat(obj.name, " is towing out a fully assembled turbine (", num2str(obj.hold), "hrs).");
-                        sim.loadPlatform = true;
+                        sim.loadTurbine = true;
                         sim.towInfo(2) = obj.hold;
                     end
                 elseif obj.installIdx ~= 999 && obj.lat == sim.array(obj.installIdx, 1) && ...
@@ -243,7 +251,7 @@ classdef Towing < Vessel
                         obj.lon == sim.array(obj.installIdx, 2) && sim.array(obj.installIdx, 3) == 2
                     % we have arrived, but the AHTS is not here yet
                     obj.status = "OnSite";
-                    sim.towInfo(2) = 0;
+                    sim.towInfo(2) = 0;                    
                     out = strcat(obj.name, " is waiting on site with a fully assembled turbine.");
                     obj.speed = obj.speedLookup(2);
                 elseif obj.installIdx ~= 999 && obj.lat == sim.array(obj.installIdx, 1) && ...

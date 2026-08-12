@@ -43,7 +43,6 @@ classdef PlatformPort < Port
             obj = obj@Port(name, lat, lon, hourlyRate);
             obj.assemblyTime = assemblyTime;
             obj.arraySize = arraySize;
-            
         end
 
 
@@ -52,8 +51,8 @@ classdef PlatformPort < Port
             obj.workTime = obj.assemblyTime*N;
             obj.cost = obj.assemblyTime*obj.hourlyRate*N;
             obj.nPlatforms = N;
+            obj.assembled = N;
             obj = obj.addToStorage(N);
-            obj.assembled = obj.nPlatforms;
         end
 
 
@@ -80,10 +79,10 @@ classdef PlatformPort < Port
 
 
             %% Check wet storage, if we are maxed out we stop
-            if ~sim.loadPlatform && obj.nPlatforms == obj.maxStorage
+            if ~all(sim.loadPlatform) && obj.nPlatforms == obj.maxStorage
                 sim.nPlatforms = obj.nPlatforms;
                 obj.stopTime = obj.stopTime + 1;
-                out = strcat(obj.name, " has ", num2str(obj.nPlatforms), " platfomrs in wet storage! (TPORTBAD)");
+                out = strcat(obj.name, " has ", num2str(obj.nPlatforms), " platforms in wet storage! (PPORTBAD)");
                 return
             end
 
@@ -92,20 +91,27 @@ classdef PlatformPort < Port
             if delay
                 out = strcat(obj.name, " delayed by weather.");
                 % catch for if a tow is looking for a Platform
-                if sim.loadPlatform && obj.nPlatforms > 0
-                    sim.loadPlatform = false;
-                    obj = obj.removeFromStorage(1);
-                    obj.nPlatforms = obj.nPlatforms - 1;
+                if any(sim.loadPlatform) && obj.nPlatforms > 0
+                    count = min(sum(sim.loadPlatform,'all'),obj.nPlatforms); %if multiple tows are looking for a platform
+                    trueIdx = find(sim.loadPlatform);
+                    sim.loadPlatform (trueIdx(1:count)) = false;
+                    obj = obj.removeFromStorage(count);
+                    obj.nPlatforms = obj.nPlatforms - count;
                     out = strcat(out, ".. Platform removed from wet storage.");
+                    count = inf;
+                    trueIdx = inf;
                 end
                 return
-            else
+            elseif sim.timeToPlatform > 0 && isfinite(sim.timeToPlatform)
                 % randomly increase/decrease work time by an hour on a 1/2^n chance
                 % prob = 2^6;
                 % if randi([1,prob], 1) == prob
                 %     obj.workTime = max([obj.workTime + sign(normrnd(0,1)), 0]);
                 % end
                 obj.workTime = obj.workTime + 1;
+                sim.timeToPlatform = sim.timeToPlatform - 1;
+                out = 'platform construction continuing';
+                %out = strcat(out, ".. platform construction continuing.");
             end
 
 
@@ -121,38 +127,46 @@ classdef PlatformPort < Port
                 out = 'All platforms assembled.';
                 obj.status = "Assembly Finished";
                 sim.timeToPlatform = 0;
-            elseif rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime) >= 1
+            %elseif obj.workTime> 0 && obj.workTime < obj.assemblyTime
+            %    out = 'First platform assembly in progress';
+            %    sim.timeToPlatform = obj.assemblyTime - obj.workTime;
+            %elseif rem((obj.workTime - obj.assemblyTime*obj.assembled)/obj.assemblyTime, obj.assemblyTime) >= 1
                 % a platform has been assembled
+            elseif sim.timeToPlatform == 0 && obj.assembled <obj.arraySize && obj.nPlatforms < sim.wetStorage_Platforms
                 obj.nPlatforms = obj.nPlatforms + 1;
                 obj.assembled = obj.assembled +1;
                 obj = obj.addToStorage(1);
                 out = 'Platform moved to storage.';
                 if obj.assembled == obj.arraySize
-                    sim.timeToPlatform = 0;
+                    sim.timeToPlatform = inf;
+                    out = 'Platform moved to storage. ALL PLATFORMS ASSEMBLED.';
                 else
-                    sim.timeToPlatform = (1-rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                    sim.timeToPlatform = obj.assemblyTime;%(1-rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                    out = 'Platform moved to storage and new platform assembly in progress.';
+                    obj.status = "Assembling";
                 end
-            else % assembly is in progress
-                out = 'Platform assembly in progress.';
+            elseif isinf(sim.timeToPlatform) && obj.assembled < obj.arraySize
+                %start constructing a platform
+                sim.timeToPlatform = obj.assemblyTime;%(1-rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                out = 'New platform assembly in progress.';
                 obj.status = "Assembling";
-                sim.timeToPlatform = (1-rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
             end
 
 
             %% a towing vessel has requested a platform, update storage
-            if sim.loadPlatform && obj.nPlatforms> 0
-                sim.loadPlatform = false;
-                obj = obj.removeFromStorage(1);
-                obj.nPlatforms = obj.nPlatforms - 1;
-                out = strcat(out, ".. Platform removed from wet storage.");
+            if any(sim.loadPlatform) && obj.nPlatforms> 0
+                count = min(sum(sim.loadPlatform,'all'),obj.nPlatforms); %if multiple tows are looking for a platform
+                trueIdx = find(sim.loadPlatform);
+                sim.loadPlatform (trueIdx(1:count)) = false;
+                obj = obj.removeFromStorage(count);
+                obj.nPlatforms = obj.nPlatforms - count;
+                count = inf;
+                trueIdx = inf;
+                out = strcat("Platform removed from wet storage.");
             end
 
             %% fill the sim variable and update internal time
             sim.nPlatforms = obj.nPlatforms;
-            sim.timeToPlatform = round(sim.timeToPlatform);
-            if sim.PortsSame == 1
-                sim.timeToTurbine = sim.timeToPlatform;
-            end
         end
     end
 end

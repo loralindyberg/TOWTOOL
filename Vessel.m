@@ -56,6 +56,10 @@ classdef Vessel
         corridor struct = struct()
         % the transfer corridors (if multiple ports)
         corridorLookup struct = struct()
+        % towing limit - 1 = can not tow assembled turbine
+        lim (1,1) double = 0
+        % index of the vessel
+        no (1,1) double = 1
     end
 
 
@@ -76,10 +80,11 @@ classdef Vessel
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
+        function obj = Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, lim, no)
             % Save vessel identifiers.
             obj.name = name;
             obj.type = type;
+            obj.no = no;
 
             % Save vessel information.
             obj.mobilizeTime = mobilizeTime;
@@ -92,6 +97,7 @@ classdef Vessel
                 obj.lon = startLocation(1,2);
                 obj.port = [startLocation(1,1), startLocation(1,2)];
                 obj.corridor = corridor;
+                obj.lim = 0;
 
             % Tow Vessel - Save vessel starting location (assume platform port) and port location.
             elseif obj.type == 'Tow Vessel'
@@ -99,7 +105,8 @@ classdef Vessel
                 obj.lon = startLocation(1,2);
                 obj.port = startLocation(1,1:2);
                 obj.corridorLookup = corridor;
-                if size(startLocation,1) == 1
+                obj.lim = lim;
+                if size(startLocation,1) == 1 && obj.lim == 0
                     obj.portLookup = [startLocation(1:2); 0,0];
                     obj.corridor = corridor;
                 else
@@ -107,7 +114,7 @@ classdef Vessel
                     obj.corridor = corridor.PlatformCorridor;
                 end
             else 
-                disp('ERROR: Unrecognized vessel type')
+                error('Unrecognized vessel type')
             end
 
             % Initialize the mobilization oh the vessel.
@@ -184,7 +191,7 @@ classdef Vessel
             if obj.type == "Tow Vessel" && obj.portLookup(2,2) ~= 0 %if multiple ports
                 if obj.lat == obj.portLookup(1,1) && obj.lon == obj.portLookup(2,2) % if vessel is currently in platform port
                     % tow platform to turbine port
-                    obj.corridor = obj.corridorLookup.PlatformCorrdior;
+                    obj.corridor = obj.corridorLookup.PlatformCorridor;
                 elseif obj.lat == obj.portLookup(2,1) && obj.lon == obj.portLookup(2,2) % if vessel currently in turbine port
                     % and needs to go to platform port
                     if lat == obj.portLookup(1,1) && lon == obj.portLookup(1,2)
@@ -214,22 +221,22 @@ classdef Vessel
                 % on the way to the port
                 to = [obj.corridor.rallyPoint(1), obj.corridor.rallyPoint(2)];
                 fro = [obj.lat, obj.lon];
-                t = obj.corridor.time;
+                dist = obj.corridor.dist;
             elseif ~isempty(obj.corridor) && (obj.lat == obj.port(1) && obj.lon == obj.port(2))
                 % on the way from the port
                 to = [lat, lon];
                 fro = [obj.corridor.rallyPoint(1), obj.corridor.rallyPoint(2)];
-                t = obj.corridor.time;
+                dist = obj.corridor.dist;
             else
                 % corridor not needed/not given
-                to = [lat, lon]; fro = [obj.lat, obj.lon]; t = 0;
+                to = [lat, lon]; fro = [obj.lat, obj.lon]; dist = 0;
             end
 
             % transit distance
-            dist = distance(to(1), to(2), fro(1), fro(2), proj);
+            dist_new = distance(to(1), to(2), fro(1), fro(2), proj);
 
             % transit details
-            t = t + round(dist/obj.speed);
+            t = round((dist+dist_new)/obj.speed);
             out = strcat(obj.name, ' in transit for ', num2str(t), ' hours.');
 
             % information for the vessel
@@ -286,6 +293,7 @@ classdef Vessel
             if ~isempty(idx)
                 obj.installIdx = idx;
             end
+
         end
 
 

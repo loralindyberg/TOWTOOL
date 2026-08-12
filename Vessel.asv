@@ -56,6 +56,8 @@ classdef Vessel
         corridor struct = struct()
         % the transfer corridors (if multiple ports)
         corridorLookup struct = struct()
+        % towing limit - 1 = can not tow assembled turbine
+        lim (1,1) double = 0
     end
 
 
@@ -76,7 +78,7 @@ classdef Vessel
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
+        function obj = Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor,lim)
             % Save vessel identifiers.
             obj.name = name;
             obj.type = type;
@@ -92,6 +94,7 @@ classdef Vessel
                 obj.lon = startLocation(1,2);
                 obj.port = [startLocation(1,1), startLocation(1,2)];
                 obj.corridor = corridor;
+                obj.lim = 0;
 
             % Tow Vessel - Save vessel starting location (assume platform port) and port location.
             elseif obj.type == 'Tow Vessel'
@@ -99,10 +102,11 @@ classdef Vessel
                 obj.lon = startLocation(1,2);
                 obj.port = startLocation(1,1:2);
                 obj.corridorLookup = corridor;
-                if size(startLocation,1) == 1 % Turbine & platform port are the same
-                    obj.portLookup = [startLocation(1:2); 0, 0];
+                obj.lim = lim;
+                if size(startLocation,1) == 1 && obj.lim == 0
+                    obj.portLookup = [startLocation(1:2); 0,0];
                     obj.corridor = corridor;
-                else % Separate turbine and platform ports
+                else
                     obj.portLookup = startLocation(:,1:2);
                     obj.corridor = corridor.PlatformCorridor;
                 end
@@ -113,6 +117,7 @@ classdef Vessel
             % Initialize the mobilization oh the vessel.
             obj = obj.mobilize();
         end
+
 
         %% step
         % this is the main funciton called in the simulation and represents actions that every vessel will take at every
@@ -180,7 +185,7 @@ classdef Vessel
         % sets up the necessary behaviors for the "Transit" status
         function [obj, out] = transit(obj, lat, lon, proj)
             % Multi-port - Switch port & corridor
-            if obj.type == "Tow Vessel" && obj.portLookup(2,2) ~= 0 %if multiple ports
+            if obj.lim == 0 && obj.type == "Tow Vessel" && obj.portLookup(2,2) ~= 0 %if multiple ports
                 if obj.lat == obj.portLookup(1,1) && obj.lon == obj.portLookup(2,2) % if vessel is currently in platform port
                     % tow platform to turbine port
                     obj.corridor = obj.corridorLookup.PlatformCorrdior;
@@ -260,13 +265,25 @@ classdef Vessel
 
         %% findLocation
         % find the next grid location to go to
-        function obj = findLocation(obj, simArray, proj)
+        function obj = findLocation(obj, sim, proj)
+            simArray = sim.array;
             % Sub classes have slightly different behaviors
             switch class(obj)
                 case 'AHTS'
                     possLocs = simArray(simArray(:, 3) < 2, :);
                 case 'Towing'
                     possLocs = simArray(simArray(:, 3) == 2, :);
+                    % if that was already selected by another tow vessel, pick a new one
+                    info = sim.towInfo;
+                    info(obj.no,:) = []; %remove this vessel's row (only look at what other vessels are doing
+                    if any(Info(:,1) ~= 999)
+                        for i = 1:length(sim.towInfo(:,1))
+                            ID = sim.towInfo(i,1);
+                            if ID ~= 999 && isfinite(ID)
+                                possLocs(possLocs(:,4)==ID,:) = []; 
+                            end
+                        end
+                    end
                 otherwise
                     possLocs = simArray(simArray(:, 3) < 3, :);
             end
@@ -280,6 +297,8 @@ classdef Vessel
             catch
                 idx = 999;
             end
+
+
 
             % save the index
             if ~isempty(idx)

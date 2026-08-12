@@ -1,9 +1,64 @@
-Input files
-AHTS - old, but added TYPE
-Mooring Port - Old
-Port - Old
-Towing - New
-Turbine Port - new
-Platform port - new
-Vessel - check for errors
-Weather - old
+Turbine - fully assembled, ready to be towed out
+Platform - platform without turbine assembled
+Plat - platform in turbine port
+
+Array
+	Column 1: Latitude
+	Column 2: Longitude
+	Column 3: Status 
+	Column 4: ID 
+	Column 5: Completion Time
+	Column 6: Water Depth
+
+Array Status
+	(0) Nothing Installed
+	(1) Mooring Install In Progress
+	(2) Moorings Installed
+	(3) Turbine Installed
+
+
+Sim.towInfo 
+	Column 1: ID of turbine (999 if no turbine, from obj.installIdx if there is a turbine)
+	Column 2: Time towing to array (from obj.hold)
+	Column 3: Time towing between ports (from obj.hold, does not trigger a Idx)
+	Column 4: 0 = not towing a turbine between ports, 1 = towing a turbine between ports
+	ROW DETERMINED BY TOWING VESSEL #
+
+
+
+
+Vessel Statuses: null, Mobilizing, Transit, Docked, Delayed, Leave, Finished
+Tow Vessel Statuses: Towing, AssistingAHTS, OnSite
+AHTS Vessel Statuses: LoadingMoorings, PreInstall, InstallingAnchor, InstallingMooring, ConnectingMoorings, Waiting
+Port Statuses: null, Delayed, Finished
+Turbine & Platform Port Statuses: Assembling, Waiting, Assembly Finished
+Mooring Port Statuses: Mobilized, Moorings Ready
+
+Mooring Installation Times (hr)
+Preinstall = 1 
+Anchor Install = 4 + 0.005 * abs(Water Depth)
+Mooring Install = 0.005 * abs(Water Depth)
+Connecting Moorings = 20 + Moorings per turbine
+
+
+
+
+
+
+Multi Tow Vessel Changes
+Added tow limits (tow1Lim, obj.lim) in case a tow vessel can only tow a platform without a turbine
+sim.towLim keeps track if any vessel is limited. If yes, unlimited tow vessels will prioritize the turbine port unless the platform port's wet storage is full or they are already in the platform port.
+
+towInfo: 1x3 array to nx3 matrix - each vessel gets its own row
+loadTurbine, loadPlatform & loadPlat: 1x1 to 1xn - each vessel gets
+
+added sim.AHTSHelpIdx to keep track of which tow vessel AHTS is currently assisting. If multiple tow vessels require assistance at the same time, AHTS will prioritize by tow vessel number
+changed findLocation function to import all of sim instead of sim.array & avoid picking a location that another tow vessel is already towing to
+
+Changed the logic of a new platform/turbine was built & added to storage (since it wasn't working well - first platform ready immediately)
+Original: if rem((obj.workTime - obj.assemblyTime*obj.nPlatforms)/obj.assemblyTime, obj.assemblyTime) >= 1
+New: obj.workTime > (obj.assembled+1)*obj.assemblyTime
+Added an elseif in TurbinePort & PlatformPort logic of building turbines and adding to storage - first platform was being built immediately
+
+
+Disclaimer: Real marine operations involve consideration for life safety and integrity of vessels doing the work. The outputs of this tool are limited to planning purposes only.

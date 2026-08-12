@@ -37,13 +37,13 @@ classdef AHTS < Vessel
     %% Shared and public methods
     methods
         %% Class constructor
-        function obj = AHTS(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, preinstallLim, anchorLim, mooringLim)%, cable)
+        function obj = AHTS(name, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor, transitLim, preinstallLim, anchorLim, mooringLim, storageLimit)%, cable)
             type = 'AHTS';
-            obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor)
+            obj = obj@Vessel(name, type, speed, speedLookup, hourlyRate, mobilizeTime, startLocation, corridor,0,1)
             obj.limits = struct('Name', {"Transit"; "PreInstall"; "InstallingAnchor"; "InstallingMooring"}, ...
                 'Hs', {transitLim(1); preinstallLim(1); anchorLim(1); mooringLim(1)}, ...
                 'Vhub', {transitLim(2); preinstallLim(2); anchorLim(2); mooringLim(2)});
-
+            obj.storageLimit = storageLimit;
             % Initialize the AHTS install times for pre-lay analysis
             obj.installTimes = struct('Name',{"PreInstall"; "InstallingAnchor"; "InstallingMooring"; "ConnectingMoorings"}, ...
                     'Time', {0; 0; 0; 20 + obj.moorsPerTurb});
@@ -78,11 +78,11 @@ classdef AHTS < Vessel
                     'Time', {1; round(4 + 0.005 * obj.depth); round(0.005 * obj.depth); 20 + obj.moorsPerTurb});
             end
 
-            if obj.slope == 999
-                p = polyfit([min(sim.array(:,6)),max(sim.array(:,6))], [18, 16], 1);
-                obj.slope = p(1);
-                obj.intercept = p(2);
-            end
+            %if obj.slope == 999
+            %    p = polyfit([min(sim.array(:,6)),max(sim.array(:,6))], [18, 16], 1);
+            %    obj.slope = p(1);
+            %    obj.intercept = p(2);
+            %end
 
 
             %% Enact delay
@@ -204,7 +204,7 @@ classdef AHTS < Vessel
                 % modify storage based on depth
                 loc = obj.findLocation(sim.array, sim.proj).installIdx;
                 if loc ~= 999
-                    obj.storageLimit = round(obj.intercept + obj.slope * sim.array(loc, 6));
+                    %obj.storageLimit = round(obj.intercept + obj.slope * sim.array(loc, 6));
                     % check the simulation object for how many moorings are available
                     % request max, or the stored number of moorings if nMoorings < max
                     requestedMoorings = min([sim.nMoorings, obj.storageLimit]);
@@ -255,19 +255,23 @@ classdef AHTS < Vessel
             %% THE AHTS HAS DONE NOTHING AT ALL
             if exist('out', 'var') ~= 1
                 if all(sim.array(:, 3) >= 2) && sim.nTurbines < 1
-                    if sim.timeToTurbine > obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2 + 72 || sim.towInfo(2) > obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2 + 72
-                        % All mooring installation points are installed and turbines are currently at a long
-                        % lead time. Go on leave to allow wet storage to fill.
+                    if isfinite(sim.towInfo(2)) && sim.towInfo(2) <= obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2.1
+                        % We are too far from port to return before the turbine arrives, so wait until it is on site
+                        out = strcat("Turbine nearly on site, ", obj.name, " is waiting.");
+                        obj.status = "Waiting";
+                    elseif (sim.timeToTurbine > 168 || isinf(sim.timeToTurbine))) && (sim.towInfo(2) > 168 || isinf(sim.towInfo(2)))%obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2 + 72 || sim.towInfo(2) > obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2 + 72
+                        % All mooring installation points are installed and turbines are currently at a long lead time. Go on leave to allow wet storage to fill.
                         out = strcat("ALL MOORINGS INSTALLED.    ", obj.name, " is currently awaiting orders. Going on ", num2str(sim.timeToTurbine), "hr leave.");
                         obj = obj.transit(obj.port(1), obj.port(2), sim.proj);
-                        if sim.timeToTurbine == 0 && isfinite(sim.towInfo(2))
-                            obj.hold = sim.towInfo(2) - obj.hold; % subtract return time from the leave calculation
-                        else
-                            obj.hold = max([sim.timeToTurbine - obj.hold, 0]); % subtract return time from the leave calculation
-                        end
+                        %if isfinite(sim.towInfo(2))
+                        %    obj.hold = sim.towInfo(2) - obj.hold; % subtract return time from the leave calculation
+                        %else
+                        %    obj.hold = 168; % go on leave for a week
+                        %end
+                        obj.hold = 168; % go on leave for a week
                         obj.status = "Leave";
                         sim.towWait = true;
-                    elseif sim.timeToTurbine > obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2.1
+                    elseif isfinite(sim.timeToTurbine) && sim.timeToTurbine > obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2.1
                         % All mooring installation points are installed and a turbine is near completion. Dock.
                         out = strcat("ALL MOORINGS INSTALLED.    ", obj.name, " is docking for ", num2str(sim.timeToTurbine), "hrs.");
                         obj = obj.transit(obj.port(1), obj.port(2), sim.proj);
@@ -277,7 +281,7 @@ classdef AHTS < Vessel
                     else
                         % All mooring installation points are installed and a turbine is so close we can't dock
                         out = strcat("ALL MOORINGS INSTALLED.    Turbine ready in ", num2str(sim.timeToTurbine), "hrs. ", obj.name, " waiting.");
-                        obj.hold = sim.timeToTurbine - obj.hold; % subtract return time from the docked calculation
+                        %obj.hold = sim.timeToTurbine - obj.hold; % subtract return time from the docked calculation
                         obj.status = "Waiting";
                     end
                 elseif isfinite(sim.towInfo(2)) && sim.towInfo(2) <= obj.transit(obj.port(1), obj.port(2), sim.proj).hold*2.1

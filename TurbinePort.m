@@ -73,13 +73,6 @@ classdef TurbinePort < Port
             %% call the super class step function
             [obj, delay] = step@Port(obj, sim);
 
-
-            if sim.PortsSame == 1
-                obj.status = 'Finished';
-                out = '';
-                return
-            end
-
             %% This is the end condition. Once this is met, the port stops accruing cost
             if obj.status == "Finished"
                 out = '';
@@ -96,10 +89,13 @@ classdef TurbinePort < Port
             
             %catch if a platform was just unloaded
             if sim.PortsSame == 0
-                if sim.loadPlat 
-                    obj.nPlat = obj.nPlat + 1;
+                if any(sim.loadPlat) 
+                    wetStorage = sim.wetStorage_Turbines - sim.nTurbines - sim.nPlat;
+                    count = min(sum(sim.loadPlat),wetStorage);
+                    trueIdx = find(sim.loadPlat);
+                    sim.loadPlat (trueIdx(1:count)) = false;
+                    obj.nPlat = obj.nPlat + count;
                     out = strcat("Platform added to Turbine port wet storage.");
-                    sim.loadPlat = false;
                 end
             end
 
@@ -107,22 +103,33 @@ classdef TurbinePort < Port
             if delay
                 out = strcat(obj.name, " delayed by weather.");
                 % catch for if a tow is looking for a turbine
-                if sim.loadTurbine && obj.nTurbines > 0
-                    sim.loadTurbine = false;
-                    obj = obj.removeFromStorage(1);
-                    obj.nTurbines = obj.nTurbines - 1;
+                if any(sim.loadTurbine) && obj.nTurbines > 0
+                    count = min(sum(sim.loadTurbine,'all'),obj.nTurbines);
+                    trueIdx = find(sim.loadTurbine);
+                    sim.loadTurbine (trueIdx(1:count)) = false;
+                    obj = obj.removeFromStorage(count);
+                    obj.nTurbines = obj.nTurbines - count;
                     out = strcat(out, ".. Turbine removed from wet storage.");
+                    count = inf;
+                    trueIdx = inf;
                 end
                 return
-            elseif obj.nPlat > 0 && sim.PortsSame == 0
-                % randomly increase/decrease work time by an hour on a 1/2^n chance
-                % prob = 2^6;
-                % if randi([1,prob], 1) == prob
-                %     obj.workTime = max([obj.workTime + sign(normrnd(0,1)), 0]);
-                % end
+            elseif sim.timeToTurbine > 0 && isfinite(sim.timeToTurbine)
                 obj.workTime = obj.workTime + 1;
-            elseif sim.PortsSame == 1
-                obj.workTime = obj.workTime + 1;
+                sim.timeToTurbine = sim.timeToTurbine - 1;
+            %elseif obj.nTurbines == sim.wetStorage_Turbines
+            %
+            %elseif obj.nPlat > 0 && sim.PortsSame == 0
+            %    % randomly increase/decrease work time by an hour on a 1/2^n chance
+            %    % prob = 2^6;
+            %   % if randi([1,prob], 1) == prob
+            %    %     obj.workTime = max([obj.workTime + sign(normrnd(0,1)), 0]);
+            %    % end
+            %    obj.workTime = obj.workTime + 1;
+            %    sim.timeToTurbine = sim.timeToTurbine - 1;
+            %elseif sim.PortsSame == 1
+            %    obj.workTime = obj.workTime + 1;
+            %    sim.timeToTurbine = sim.timeToTurbine - 1;
             end
 
 
@@ -132,13 +139,14 @@ classdef TurbinePort < Port
                 % port operations are finished
                 [obj, out] = obj.finish(sim.time);
                 out = strcat(out, ' All turbines towed.');
-                sim.timeToTurbine = 0;
+                sim.timeToTurbine = inf;
             elseif obj.assembled == obj.arraySize
                 % Turbine assembly has ended, purely wet storage
                 out = 'All turbines assembled.';
                 obj.status = "Assembly Finished";
-                sim.timeToTurbine = 0;
-            elseif rem(obj.workTime - obj.assemblyTime*obj.assembled/obj.assemblyTime, obj.assemblyTime) >=1
+                sim.timeToTurbine = inf;
+            %elseif rem(obj.workTime - obj.assemblyTime*obj.assembled/obj.assemblyTime, obj.assemblyTime) >=1
+            elseif sim.timeToTurbine == 0 && obj.assembled < obj.arraySize && obj.nTurbines< sim.wetStorage_Turbines
                 % a turbine has been assembled
                 obj.nTurbines = obj.nTurbines + 1; %add turbine to "Ready" wet storage
                 obj.assembled = obj.assembled + 1;
@@ -150,27 +158,37 @@ classdef TurbinePort < Port
                 end
                 obj = obj.addToStorage(1);
                 
-                if obj.nTurbines == obj.arraySize
-                    sim.timeToTurbine = 0;
+                if obj.assembled == obj.arraySize
+                    sim.timeToTurbine = inf;
+                elseif sim.PortsSame == 0 && obj.nPlat > 0
+                    sim.timeToTurbine = obj.assemblyTime;%(1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                    obj.status = "Assembling";
+                elseif sim.PortsSame == 1
+                    sim.timeToTurbine = obj.assemblyTime;%(1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                    obj.status = "Assembling";
                 else
-                    sim.timeToTurbine = (1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                    sim.timeToTurbine = inf;
                 end
-            elseif  obj.nPlat > 0 && sim.PortsSame == 0 % assembly is in progress
-                out = 'Turbine assembly in progress.';
+            elseif  isinf(sim.timeToTurbine) && sim.nPlat > 0 && sim.PortsSame == 0 % assembly is in progress
+                %start assembling a new turbine
+                out = 'New turbine assembly in progress.';
                 obj.status = "Assembling";
-                sim.timeToTurbine = (1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
+                sim.timeToTurbine = obj.assemblyTime; %(1-rem((obj.workTime - obj.assemblyTime*obj.nTurbines)/obj.assemblyTime, obj.assemblyTime))*obj.assemblyTime;
             else
                 out = 'Turbine port waiting for platform to assemble';
                 obj.status = "Waiting";
             end
 
-
             %% a towing vessel has requested a turbine, update storage
-            if sim.loadTurbine && obj.nTurbines > 0
-                sim.loadTurbine = false;
-                obj = obj.removeFromStorage(1);
-                obj.nTurbines = obj.nTurbines - 1;
+            if any(sim.loadTurbine) && obj.nTurbines > 0
+                count = min(sum(sim.loadTurbine,'all'),obj.nTurbines);
+                trueIdx = find(sim.loadTurbine);
+                sim.loadTurbine (trueIdx(1:count)) = false;
+                obj = obj.removeFromStorage(count);
+                obj.nTurbines = obj.nTurbines - count;
                 out = strcat(out, ".. Turbine removed from wet storage.");
+                count = inf;
+                trueIdx = inf;
             end
 
 
