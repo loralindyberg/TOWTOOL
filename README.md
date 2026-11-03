@@ -28,8 +28,6 @@ This will create a folder at */path/to/local/folder* with the name TOWTOOL.
 
 #### Dependencies
 This toolbox requires a minimum of `MATLAB 2025b`, and it is recommended to have all available add-ons installed.
-If users would like to use the weather module, they will need weather data in the form of a structure saved in either a .mat file or a .csv.
-There is an example of both data structures in this repository, user data will require the same structure.
 
 ## Deployment
 Once the toolbox has been installed via the preferred method, use of the code is simple.
